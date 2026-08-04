@@ -91,10 +91,10 @@ assets:
     - "^kubeconform-linux-arm64\\.tar\\.gz$"
   # Staged rollout — uncommented one pass at a time, in lockstep with the
   # matching key in ../mirror-base.yml's `platforms:`. See the note there.
-  # darwin/amd64:
-  #   - "^kubeconform-darwin-amd64\\.tar\\.gz$"
-  # darwin/arm64:
-  #   - "^kubeconform-darwin-arm64\\.tar\\.gz$"
+  darwin/amd64:
+    - "^kubeconform-darwin-amd64\\.tar\\.gz$"
+  darwin/arm64:
+    - "^kubeconform-darwin-arm64\\.tar\\.gz$"
   # windows/amd64:
   #   - "^kubeconform-windows-amd64\\.zip$"
   # windows/arm64:
