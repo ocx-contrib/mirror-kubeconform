@@ -95,10 +95,10 @@ assets:
     - "^kubeconform-darwin-amd64\\.tar\\.gz$"
   darwin/arm64:
     - "^kubeconform-darwin-arm64\\.tar\\.gz$"
-  # windows/amd64:
-  #   - "^kubeconform-windows-amd64\\.zip$"
-  # windows/arm64:
-  #   - "^kubeconform-windows-arm64\\.zip$"
+  windows/amd64:
+    - "^kubeconform-windows-amd64\\.zip$"
+  windows/arm64:
+    - "^kubeconform-windows-arm64\\.zip$"
 
 # Every archive — tarball and zip alike — is FLAT: exactly two entries, `LICENSE`
 # (0644) and `kubeconform` (`kubeconform.exe` on Windows, mode 0755), both at
