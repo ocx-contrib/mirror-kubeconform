@@ -6,7 +6,7 @@ name: kubeconform
 
 on:
   schedule:
-    - cron: '24 */6 * * *'
+    - cron: '46 3-23/6 * * *'
   workflow_dispatch:
   push:
     branches: [main]
