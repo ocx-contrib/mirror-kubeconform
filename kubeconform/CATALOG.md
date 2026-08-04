@@ -33,17 +33,6 @@ Output is machine-readable on demand — `-output json`, `junit`, `tap`, `text` 
 The release archive also ships upstream's `LICENSE` beside the binary; it is
 inside the bundle but not on `PATH`.
 
-## Install with ocx
-
-```sh
-ocx install ocx.sh/kubeconform/kubeconform
-```
-
-```sh
-# or pin a specific version
-ocx install ocx.sh/kubeconform/kubeconform:0.8.0
-```
-
 ## Links
 
 - [kubeconform on GitHub](https://github.com/yannh/kubeconform)
