@@ -1,0 +1,102 @@
+# Repo-wide policy for the kubeconform mirror.
+#
+# NOT a spec: it has no name/target/source and is never loaded on its own.
+# Everything a package owns — name, target, source, assets, asset_type,
+# bin_scan, metadata, catalog, tests, versions, announce, annotations — stays
+# in kubeconform/mirror.yml.
+#
+# ⚠️ `extends:` is a SHALLOW merge of top-level keys. A spec that sets a key
+# below replaces that block OUTRIGHT — there is no per-key merge. `platforms:`
+# is where this bites: it carries BOTH the runner matrix and the container
+# legs, so a child that restates it to tweak one runner silently drops every
+# `containers:` entry. Nothing reds — the legs simply stop existing, and every
+# os.features claim in that spec goes back to being merely asserted. This repo
+# is single-package, so `platforms:` lives HERE and kubeconform/mirror.yml does
+# not restate it — the trap is structurally eliminated rather than merely
+# avoided.
+
+skip_prereleases: true
+cascade: true
+
+# New package, so the fleet rule applies unconditionally. A cascade tag
+# (`latest`, `0`, `0.8`) re-points on every re-publish; without a build segment
+# the new manifest reuses the bare version tag and orphans the prior digest for
+# registry GC, breaking any `@sha256:` pin in a consumer's ocx.lock. The `none`
+# exception applies only where upstream versions ALREADY carry semver build
+# metadata — kubeconform tags `vX.Y.Z` with no `+build` segment, so it does not.
+build_timestamp: date
+
+verify:
+  github_asset_digest: true
+
+concurrency:
+  # Assets are ~6.6–7.4 MB gzip tarballs / zips around a single fat static Go
+  # binary (13–14 MB unpacked, unstripped) plus the LICENSE file.
+  max_downloads: 8
+  max_bundles: 4
+  max_pushes: 2
+  rate_limit_ms: 100
+  max_retries: 3
+  compression_threads: 0
+
+# ─── Platform matrix ────────────────────────────────────────────────────────
+#
+# `os.features` states what an artifact REQUIRES OF THE HOST — it is not a
+# label for how it was built. Measured per arch on BOTH ends of the declared
+# range (v0.7.0 floor and v0.8.0 head); the evidence, command by command, sits
+# above `assets:` in kubeconform/mirror.yml. Both Linux arches are CGO-free
+# static Go binaries — `file` says "statically linked", `readelf -l | grep -c
+# INTERP` is 0, `readelf -d | grep -c NEEDED` is 0, and there is not a single
+# GLIBC_* symbol version — so both keys are BARE.
+#
+# `+libc.musl` on either would be a false requirement that hid the package from
+# every glibc host it in fact runs on; `+libc.glibc` would hide it from every
+# musl host. A bare key claims universality, so it must prove it:
+# ubuntu (glibc) + alpine (musl) + fedora (a different glibc vintage) on BOTH
+# arches. THE ALPINE LEG IS THE PROOF — drop it and the claim is merely
+# asserted.
+#
+# Staged rollout (skill Phase 10): darwin and windows are pre-written and
+# commented out below AND in kubeconform/mirror.yml's `assets:`, uncommented one
+# pass at a time once the Linux legs are end-to-end green. Both halves are
+# commented together on purpose — a declared-but-unmatched platform still boots
+# a real macOS/Windows runner and reports SUCCESS having tested nothing.
+platforms:
+  linux/amd64:
+    runner: ubuntu-latest
+    containers:
+      - { image: "ubuntu:24.04", shell: bash }
+      - { image: "alpine:3.20",  shell: sh }
+      - { image: "fedora:40",    shell: bash }
+  linux/arm64:
+    # arm64 container legs run natively — no qemu — so the runner arch must
+    # match the platform or the renderer reds the leg up front.
+    runner: ubuntu-24.04-arm
+    containers:
+      - { image: "ubuntu:24.04", shell: bash }
+      - { image: "alpine:3.20",  shell: sh }
+      - { image: "fedora:40",    shell: bash }
+  # No `containers:` on darwin or windows — those runners have no Linux
+  # container engine, and the key is rejected at spec load.
+  #
+  # darwin/amd64:
+  #   # Intel slice tested on the arm64 macos-14 runner via Rosetta 2 —
+  #   # GitHub's native macos-13 Intel pool is exhausted and deadlocks push.
+  #   runner: macos-14
+  #   prefix: ["arch", "-x86_64"]
+  # darwin/arm64:
+  #   runner: macos-14
+  #   shell: bash
+  #
+  # windows/amd64:
+  #   runner: windows-latest
+  #   shell: pwsh
+  # windows/arm64:
+  #   # Native arm64 Windows runner — the amd64 pool cannot execute an ARM64 PE.
+  #   runner: windows-11-arm
+  #   shell: pwsh
+
+notify:
+  discord:
+    webhook_secret: OCX_MIRROR_DISCORD_HOOK
+    user_id: "227748867204972545"  # pinged in-message on failures

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="kubeconform">
+  <title>kubeconform</title>
+  <!--
+    Original mark authored for the OCX mirror — upstream yannh/kubeconform
+    publishes no logo. A regular heptagon (the Kubernetes helm-wheel silhouette)
+    enclosing a check mark: "this manifest conforms".
+  -->
+  <g fill="none" stroke="#326CE5" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="256,66 404.55,137.54 441.24,298.28 338.44,427.18 173.56,427.18 70.76,298.28 107.45,137.54" />
+    <polyline points="171,259 231,321 347,193" stroke-width="42" />
+  </g>
+</svg>

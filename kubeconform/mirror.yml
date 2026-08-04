@@ -1,0 +1,166 @@
+# ⚠ `extends:` is a SHALLOW merge of TOP-LEVEL KEYS. Setting a key here
+# REPLACES the base's block outright — there is no per-key merge. `platforms:`
+# is deliberately NOT restated below: it carries the container legs that make
+# this spec's libc claims honest, and restating it to tweak one runner would
+# drop them all without reddening anything. This repo is single-package, so the
+# measured matrix lives in the base and nothing here touches it.
+extends: ../mirror-base.yml
+
+name: kubeconform
+
+# Logical index package `kubeconform/kubeconform` at the physical path
+# `ghcr.io/ocx-contrib/kubeconform/kubeconform` — slash segments, never
+# hyphen-flattened. Two segments always; `yannh` is a personal handle, not a
+# vendor, so the tool names itself. The first segment must be this repo's own
+# GitHub owner: GITHUB_TOKEN only authorises packages owned by the repo the
+# workflow runs in.
+target:
+  registry: ghcr.io
+  repository: ocx-contrib/kubeconform/kubeconform
+
+source:
+  type: github_release
+  owner: yannh
+  repo: kubeconform
+  # Tags are v-prefixed bare semver (e.g. "v0.8.0"); no other tag scheme is in
+  # use on this repo across its entire release history.
+  tag_pattern: "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
+
+# ─── libc gate (Phase 3.5) — the evidence, not the conclusion ───────────────
+#
+# `os.features` states what an artifact REQUIRES OF THE HOST. Measured on BOTH
+# ends of the declared range (v0.7.0 floor, v0.8.0 head) and on BOTH Linux
+# arches — a CGO-free Go build is the expectation, but this is the measurement:
+#
+#   $ file kubeconform            # linux-amd64, v0.8.0
+#   ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked,
+#   Go BuildID=…, with debug_info, not stripped
+#   $ file kubeconform            # linux-arm64, v0.8.0
+#   ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), statically linked,
+#   Go BuildID=…, with debug_info, not stripped
+#
+#   $ readelf -l kubeconform | grep -c INTERP  → 0   (amd64 + arm64, v0.7.0 + v0.8.0)
+#   $ readelf -d kubeconform | grep -c NEEDED  → 0   (amd64 + arm64, v0.7.0 + v0.8.0)
+#   $ readelf -V kubeconform | grep -o 'GLIBC_[0-9.]*'  → (empty, all four)
+#
+#     ⇒ no PT_INTERP, no DT_NEEDED, no glibc symbol versions at all: the
+#       artifact requires NOTHING of the host userland → BARE `linux/amd64`
+#       and BARE `linux/arm64`. `+libc.musl` would be a false requirement
+#       hiding the package from every glibc host it in fact runs on;
+#       `+libc.glibc` would hide it from every musl host. Upstream ships no
+#       gnu/musl split in any filename, consistent with the measurement.
+#       The alpine:3.20 container leg on BOTH arches is what turns the bare
+#       keys' universality claim into evidence.
+#
+# Non-Linux, for the record (no libc key applies to either):
+#   $ file kubeconform      (darwin-arm64)  → Mach-O 64-bit arm64 executable
+#   $ file kubeconform.exe  (windows-arm64) → PE32+ executable … ARM64
+#
+# ─── Scope (verified against v0.7.0 — the floor — and v0.8.0) ───────────────
+#
+# Each anchored pattern below was checked with `grep -cE` against the FULL
+# per-release asset list of every in-range release and matches EXACTLY ONE
+# asset on each. A pattern matching ZERO is silently skipped, not an error — it
+# would yield a green run with a missing platform.
+#
+# Why the floor is 0.7.0 and not 0.8.0. v0.8.0 DROPPED three upstream legs that
+# v0.7.0 and v0.6.7 shipped: `kubeconform-linux-386.tar.gz`,
+# `kubeconform-windows-386.zip`, `kubeconform-windows-armv6.zip`. That
+# regression is moot for OCX — the Architecture enum is amd64 + arm64 ONLY, so
+# none of the three was ever declarable. The intersection of what v0.7.0 and
+# v0.8.0 both ship, restricted to expressible platforms, is exactly the six
+# keys below, so no per-platform min_version/max_version window is needed. A
+# floor of 0.8.0 would leave a single release in range on a project that shipped
+# twice in three years.
+#
+# Upstream also publishes, and this mirror deliberately does not carry:
+#   kubeconform-linux-armv6.tar.gz    — armv6 has no OCX platform key
+#   kubeconform-linux-386.tar.gz      — 386 has no OCX platform key (gone at 0.8.0)
+#   kubeconform-windows-386.zip       — ditto (gone at 0.8.0)
+#   kubeconform-windows-armv6.zip     — ditto (gone at 0.8.0)
+#   CHECKSUMS                         — checksum sidecar, an EXACT filename with
+#                                       no extension, present in every release
+#
+# The terminating `\.tar\.gz$` / `\.zip$` is what keeps CHECKSUMS out, and the
+# fully literal arch segment is what keeps `armv6` from being caught by the
+# `arm64` patterns.
+assets:
+  linux/amd64:
+    - "^kubeconform-linux-amd64\\.tar\\.gz$"
+  linux/arm64:
+    - "^kubeconform-linux-arm64\\.tar\\.gz$"
+  # Staged rollout — uncommented one pass at a time, in lockstep with the
+  # matching key in ../mirror-base.yml's `platforms:`. See the note there.
+  # darwin/amd64:
+  #   - "^kubeconform-darwin-amd64\\.tar\\.gz$"
+  # darwin/arm64:
+  #   - "^kubeconform-darwin-arm64\\.tar\\.gz$"
+  # windows/amd64:
+  #   - "^kubeconform-windows-amd64\\.zip$"
+  # windows/arm64:
+  #   - "^kubeconform-windows-arm64\\.zip$"
+
+# Every archive — tarball and zip alike — is FLAT: exactly two entries, `LICENSE`
+# (0644) and `kubeconform` (`kubeconform.exe` on Windows, mode 0755), both at
+# the archive root with NO wrapper directory. Confirmed with `gzip -dc … |
+# tar tvf -` and `unzip -l` on every declared asset of v0.8.0 plus the v0.7.0
+# floor; `ustar` magic is present at offset 257 of the decompressed stream, so
+# these are real tarballs and not bare single-file .gz (which ocx-mirror cannot
+# read, and which `asset_type: binary` would silently ship still-compressed).
+#
+# strip_components: 0 because there is no top directory TO strip — stripping one
+# would consume the executable itself. The binary therefore lands at the content
+# root, so one metadata.json (PATH = ${installPath}) serves every platform and no
+# per-platform asset_type or metadata override is needed.
+asset_type:
+  type: archive
+  strip_components: 0
+
+# `off` — FORCED by the flat layout above, not chosen. The bundle's only PATH
+# entry is a bare ${installPath}; the scan only inspects an interface-visible
+# `${installPath}/<dir>` entry, so with no subdirectory to point one at both
+# `auto` and `verify` fail spec load at exit 65:
+#
+#   bin_scan is enabled but metadata.json declares no interface-visible
+#   ${installPath}/<dir> PATH entry — the verification would inspect no file and
+#   pass green whatever the archive contains.
+#
+# The `binaries` list in metadata.json is therefore hand-maintained, exactly as
+# that error directs. It is short and stable: `kubeconform` is the archive's
+# only mode-0755 entry, and `LICENSE` is 0644 data. Quoted so no YAML 1.1 reader
+# folds the bare word into boolean `false`.
+bin_scan: "off"
+
+metadata:
+  default: metadata.json
+
+catalog:
+  logo: logo.svg
+
+versions:
+  # 0.7.0 is the floor — see the scope note above `assets:`. v0.8.0 is the only
+  # release at or above 0.8.0, so a 0.8.0 floor would put a single version in
+  # range; 0.7.0 spans two and every in-range release carries all six declared
+  # assets (an asset-less release inside the range is dropped SILENTLY by the
+  # pipeline).
+  min: "0.7.0"
+  new_per_run: 5
+  poll_interval: "24 */6 * * *"
+
+tests:
+  # `script:` resolves from the REPOSITORY ROOT — unlike `metadata.default` and
+  # `catalog.logo` above, which resolve against this spec's own directory.
+  - name: smoke
+    script: kubeconform/tests/smoke.star
+
+annotations:
+  # From the Phase 1.5 license gate:
+  #   $ gh api repos/yannh/kubeconform/license --jq '.license.spdx_id'
+  #   Apache-2.0
+  org.opencontainers.image.licenses: "Apache-2.0"
+
+announce:
+  # Spelled out, not derived from target.repository — the logical name and the
+  # physical path are related by convention only.
+  package: kubeconform/kubeconform
+  fork: ocx-contrib/index
